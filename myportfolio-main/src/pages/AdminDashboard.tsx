@@ -19,6 +19,8 @@ import AdminLogin from '@/components/admin/AdminLogin'
 import Overview from '@/components/admin/views/Overview'
 import ProjectsView from '@/components/admin/views/ProjectsView'
 import MediaView from '@/components/admin/views/MediaView'
+import InquiriesView from '@/components/admin/views/InquiriesView'
+import { fetchInquiries } from '@/lib/inquiriesApi'
 
 export default function AdminDashboard() {
   // ---------- Auth ----------
@@ -112,9 +114,28 @@ export default function AdminDashboard() {
     }
   }
 
+  // ---------- Inquiry unread badge ----------
+  const [unreadInquiries, setUnreadInquiries] = useState(0)
+
+  const refreshUnreadInquiries = useCallback(async () => {
+    try {
+      const list = await fetchInquiries()
+      setUnreadInquiries(list.filter(i => !i.read).length)
+    } catch {
+      setUnreadInquiries(0)
+    }
+  }, [])
+
+  useEffect(() => { if (isAuthed) refreshUnreadInquiries() }, [isAuthed, refreshUnreadInquiries])
+
   // ---------- View routing ----------
   const [view, setView] = useState<AdminView>('overview')
   const [newProjectOpen, setNewProjectOpen] = useState(false)
+
+  // Refresh unread count when leaving the inquiries view (read state may have changed)
+  useEffect(() => {
+    if (isAuthed && view !== 'inquiries') refreshUnreadInquiries()
+  }, [view, isAuthed, refreshUnreadInquiries])
 
   // ---------- Render guards ----------
   if (authChecking) {
@@ -164,6 +185,7 @@ export default function AdminDashboard() {
         onLogout={handleLogout}
         apiConnected={apiConnected}
         topbarAction={topbarAction}
+        badges={{ inquiries: unreadInquiries }}
       >
         {view === 'overview' && (
           <Overview
@@ -184,6 +206,7 @@ export default function AdminDashboard() {
             setNewProjectOpen={setNewProjectOpen}
           />
         )}
+        {view === 'inquiries' && <InquiriesView onShowMessage={showMessage} />}
         {view === 'media' && <MediaView />}
       </AdminLayout>
 

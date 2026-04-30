@@ -1,11 +1,11 @@
 import { useState, useEffect, type ReactNode } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  LayoutDashboard, FolderKanban, ImageIcon, LogOut,
+  LayoutDashboard, FolderKanban, ImageIcon, Inbox, LogOut,
   Menu, X, ShieldCheck, ChevronRight, Wifi, WifiOff,
 } from 'lucide-react'
 
-export type AdminView = 'overview' | 'projects' | 'media'
+export type AdminView = 'overview' | 'projects' | 'media' | 'inquiries'
 
 interface NavItem {
   id: AdminView
@@ -14,9 +14,10 @@ interface NavItem {
 }
 
 const NAV: NavItem[] = [
-  { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-  { id: 'projects', label: 'Projects', icon: FolderKanban },
-  { id: 'media',    label: 'Media',    icon: ImageIcon     },
+  { id: 'overview',  label: 'Overview',  icon: LayoutDashboard },
+  { id: 'projects',  label: 'Projects',  icon: FolderKanban    },
+  { id: 'inquiries', label: 'Inquiries', icon: Inbox           },
+  { id: 'media',     label: 'Media',     icon: ImageIcon       },
 ]
 
 interface AdminLayoutProps {
@@ -26,12 +27,13 @@ interface AdminLayoutProps {
   onLogout: () => void
   apiConnected: boolean
   topbarAction?: ReactNode
+  badges?: Partial<Record<AdminView, number>>
   children: ReactNode
 }
 
 export default function AdminLayout({
   activeView, onChangeView, userEmail, onLogout,
-  apiConnected, topbarAction, children,
+  apiConnected, topbarAction, badges, children,
 }: AdminLayoutProps) {
   const [drawerOpen, setDrawerOpen] = useState(false)
 
@@ -63,6 +65,7 @@ export default function AdminLayout({
               item={item}
               active={activeView === item.id}
               onClick={() => onChangeView(item.id)}
+              badge={badges?.[item.id]}
             />
           ))}
         </nav>
@@ -122,6 +125,7 @@ export default function AdminLayout({
                     item={item}
                     active={activeView === item.id}
                     onClick={() => onChangeView(item.id)}
+                    badge={badges?.[item.id]}
                   />
                 ))}
               </nav>
@@ -179,10 +183,11 @@ export default function AdminLayout({
 
       {/* ---------- MOBILE BOTTOM NAV ---------- */}
       <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-[#08061a]/95 backdrop-blur-xl border-t border-neutral-900 pb-[env(safe-area-inset-bottom)]">
-        <div className="grid grid-cols-3">
+        <div className="grid grid-cols-4">
           {NAV.map(item => {
             const Icon = item.icon
             const isActive = activeView === item.id
+            const badge = badges?.[item.id]
             return (
               <button
                 key={item.id}
@@ -195,7 +200,14 @@ export default function AdminLayout({
                     className="absolute top-0 h-0.5 w-10 rounded-b-full bg-gradient-to-r from-cyan-400 to-blue-500"
                   />
                 )}
-                <Icon size={20} className={isActive ? 'text-cyan-300' : 'text-neutral-500'} />
+                <div className="relative">
+                  <Icon size={20} className={isActive ? 'text-cyan-300' : 'text-neutral-500'} />
+                  {!!badge && badge > 0 && (
+                    <span className="absolute -top-1.5 -right-2 min-w-[16px] h-[16px] px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center">
+                      {badge > 9 ? '9+' : badge}
+                    </span>
+                  )}
+                </div>
                 <span className={`text-[10px] font-medium ${isActive ? 'text-cyan-200' : 'text-neutral-500'}`}>
                   {item.label}
                 </span>
@@ -208,7 +220,7 @@ export default function AdminLayout({
   )
 }
 
-function NavButton({ item, active, onClick }: { item: NavItem; active: boolean; onClick: () => void }) {
+function NavButton({ item, active, onClick, badge }: { item: NavItem; active: boolean; onClick: () => void; badge?: number }) {
   const Icon = item.icon
   return (
     <button
@@ -221,7 +233,12 @@ function NavButton({ item, active, onClick }: { item: NavItem; active: boolean; 
     >
       {active && <motion.span layoutId="sideNavIndicator" className="absolute left-0 top-2 bottom-2 w-1 rounded-r-full bg-gradient-to-b from-cyan-400 to-blue-500" />}
       <Icon size={18} />
-      <span className="font-medium">{item.label}</span>
+      <span className="font-medium flex-1 text-left">{item.label}</span>
+      {!!badge && badge > 0 && (
+        <span className="min-w-[20px] h-[20px] px-1.5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+          {badge > 99 ? '99+' : badge}
+        </span>
+      )}
     </button>
   )
 }

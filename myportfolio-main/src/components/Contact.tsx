@@ -16,6 +16,7 @@ import {
 } from "@tabler/icons-react";
 import { ScrollReveal } from "./ui/ScrollReveal";
 import emailjs from '@emailjs/browser';
+import { createInquiry } from '@/lib/inquiriesApi';
 
 export default function Contact() {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -49,6 +50,20 @@ export default function Contact() {
     };
 
     try {
+      // Save inquiry to Supabase so it shows up in the admin dashboard.
+      // Don't block the submission if this fails — Web3Forms email is the source of truth.
+      try {
+        await createInquiry({
+          firstName: String(formData.get('firstname') ?? ''),
+          lastName:  String(formData.get('lastname')  ?? ''),
+          email:     String(formData.get('email')     ?? ''),
+          subject:   String(formData.get('subject')   ?? ''),
+          message:   String(formData.get('message')   ?? ''),
+        });
+      } catch (inquiryErr) {
+        console.error('Supabase inquiry insert failed:', inquiryErr);
+      }
+
       const web3Response = await fetch("https://api.web3forms.com/submit", {
         method: "POST",
         body: formData
@@ -136,8 +151,8 @@ export default function Contact() {
                   <ContactMethod 
                     icon={<IconBrandMessenger className="h-6 w-6" />}
                     label="Message me on Messenger"
-                    value="facebook.com/venzaba25"
-                    href="https://facebook.com/venzaba25"
+                    value="web.facebook.com/venzaba25"
+                    href="https://web.facebook.com/venzaba25"
                   />
 
                   {/* Quick action buttons */}
@@ -151,7 +166,7 @@ export default function Contact() {
                       <IconBrandWhatsapp className="h-4 w-4" /> WhatsApp Me
                     </a>
                     <a
-                      href="https://facebook.com/venzaba25"
+                      href="https://web.facebook.com/venzaba25"
                       target="_blank"
                       rel="noreferrer"
                       className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-300 text-sm font-semibold hover:bg-blue-500/20 hover:text-white transition-all"
@@ -173,7 +188,7 @@ export default function Contact() {
                     />
                     <SocialCircle 
                       icon={<IconBrandFacebook />} 
-                      href="https://www.facebook.com/venzaba" 
+                      href="https://web.facebook.com/venzaba25" 
                       color="hover:text-blue-600"
                     />
                   </div>

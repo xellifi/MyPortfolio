@@ -86,3 +86,46 @@ create policy "Authenticated update project-images"
 create policy "Authenticated delete project-images"
   on storage.objects for delete to authenticated
   using (bucket_id = 'project-images');
+
+-- ---------------------------------------------------------------------------
+-- Inquiries table — submissions from the public contact form.
+-- Anyone can INSERT (so visitors can send messages without auth).
+-- Only authenticated admins can SELECT / UPDATE / DELETE.
+-- ---------------------------------------------------------------------------
+
+create table if not exists public.inquiries (
+  id          bigserial primary key,
+  first_name  text not null,
+  last_name   text default '',
+  email       text not null,
+  subject     text default '',
+  message     text not null,
+  read        boolean not null default false,
+  created_at  timestamptz not null default now()
+);
+
+create index if not exists inquiries_created_at_idx on public.inquiries (created_at desc);
+create index if not exists inquiries_read_idx       on public.inquiries (read);
+
+alter table public.inquiries enable row level security;
+
+drop policy if exists "Public can insert inquiries"        on public.inquiries;
+drop policy if exists "Authenticated can read inquiries"   on public.inquiries;
+drop policy if exists "Authenticated can update inquiries" on public.inquiries;
+drop policy if exists "Authenticated can delete inquiries" on public.inquiries;
+
+create policy "Public can insert inquiries"
+  on public.inquiries for insert to anon, authenticated
+  with check (true);
+
+create policy "Authenticated can read inquiries"
+  on public.inquiries for select to authenticated
+  using (true);
+
+create policy "Authenticated can update inquiries"
+  on public.inquiries for update to authenticated
+  using (true) with check (true);
+
+create policy "Authenticated can delete inquiries"
+  on public.inquiries for delete to authenticated
+  using (true);
