@@ -1,7 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Plus, Save, Tag, List, Globe, Link as LinkIcon } from 'lucide-react'
+import {
+  X, Plus, Save, Tag, List, Globe, Link as LinkIcon,
+  Image as ImageIcon, Upload, FolderOpen, Loader2,
+} from 'lucide-react'
 import type { Project } from '@/lib/projectsApi'
+import { listProjectImageFolders, uploadProjectImage } from '@/lib/projectsApi'
 
 interface NewProjectModalProps {
   open: boolean
@@ -28,14 +32,63 @@ export default function NewProjectModal({ open, onClose, onSave }: NewProjectMod
   const [featureInput, setFeatureInput] = useState('')
   const [error, setError] = useState<string | null>(null)
 
+  // Image upload state
+  const [folders, setFolders] = useState<string[]>([])
+  const [folder, setFolder] = useState('')
+  const [newFolder, setNewFolder] = useState('')
+  const [uploadingCover, setUploadingCover] = useState(false)
+  const [uploadingGallery, setUploadingGallery] = useState(false)
+  const coverInputRef = useRef<HTMLInputElement>(null)
+  const galleryInputRef = useRef<HTMLInputElement>(null)
+
   useEffect(() => {
-    if (open) {
-      setData({ ...empty, id: Date.now() })
-      setTechInput('')
-      setFeatureInput('')
-      setError(null)
-    }
+    if (!open) return
+    setData({ ...empty, id: Date.now() })
+    setTechInput('')
+    setFeatureInput('')
+    setError(null)
+    setFolder('')
+    setNewFolder('')
+    listProjectImageFolders().then(setFolders).catch(() => setFolders([]))
   }, [open])
+
+  const folderPath = () => (folder || newFolder.trim() || 'uploads').replace(/^\/+|\/+$/g, '')
+
+  const handleCoverUpload = async (files: FileList | null) => {
+    if (!files || !files[0]) return
+    setUploadingCover(true)
+    setError(null)
+    try {
+      const url = await uploadProjectImage(files[0], folderPath())
+      setData(d => ({ ...d, image: url }))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Cover upload failed')
+    } finally {
+      setUploadingCover(false)
+      if (coverInputRef.current) coverInputRef.current.value = ''
+    }
+  }
+
+  const handleGalleryUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return
+    setUploadingGallery(true)
+    setError(null)
+    try {
+      const urls: string[] = []
+      for (const f of Array.from(files)) {
+        urls.push(await uploadProjectImage(f, folderPath()))
+      }
+      setData(d => ({ ...d, images: [...(d.images || []), ...urls] }))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Gallery upload failed')
+    } finally {
+      setUploadingGallery(false)
+      if (galleryInputRef.current) galleryInputRef.current.value = ''
+    }
+  }
+
+  const removeGalleryImage = (url: string) =>
+    setData(d => ({ ...d, images: (d.images || []).filter(x => x !== url) }))
 
   const addTech = () => {
     const t = techInput.trim()
@@ -77,7 +130,7 @@ export default function NewProjectModal({ open, onClose, onSave }: NewProjectMod
               className="bg-[#08061a] border border-neutral-800 rounded-3xl w-full max-w-2xl my-4"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex items-center justify-between p-5 border-b border-neutral-900 sticky top-0 bg-[#08061a] rounded-t-3xl">
+              <div className="flex items-center justify-between p-5 border-b border-neutral-900 sticky top-0 bg-[#08061a] rounded-t-3xl z-10">
                 <h2 className="text-lg sm:text-xl font-bold text-white">Create new project</h2>
                 <button onClick={onClose} className="p-1.5 rounded-lg text-neutral-400 hover:text-white hover:bg-neutral-800">
                   <X size={18} />
@@ -104,6 +157,120 @@ export default function NewProjectModal({ open, onClose, onSave }: NewProjectMod
                     className="w-full p-3 bg-neutral-900/60 border border-neutral-800 focus:border-blue-500 rounded-xl text-neutral-200 outline-none transition-colors resize-none"
                   />
                 </Field>
+
+                {/* ---------- Images section ---------- */}
+                <div className="rounded-2xl border border-neutral-900 bg-neutral-950/40 p-4 space-y-4">
+                  <div className="flex items-center gap-2">
+                    <ImageIcon size={14} className="text-cyan-300" />
+                    <h3 className="text-sm font-semibold text-white">Images</h3>
+                  </div>
+
+                  {/* Folder selector */}
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-[10px] text-neutral-500 uppercase tracking-widest px-1 mb-1.5 block">Use existing folder</label>
+                      <div className="relative">
+                        <FolderOpen className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-500" />
+                        <select
+                          value={folder}
+                          onChange={(e) => { setFolder(e.target.value); setNewFolder('') }}
+                          className="w-full pl-9 pr-3 py-2.5 bg-neutral-900/60 border border-neutral-800 rounded-xl text-sm text-white outline-none focus:border-blue-500 appearance-none"
+                        >
+                          <option value="">— Pick folder —</option>
+                          {folders.map(f => <option key={f} value={f}>{f}</option>)}
+                        </select>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-neutral-500 uppercase tracking-widest px-1 mb-1.5 block">Or create new</label>
+                      <input
+                        type="text"
+                        value={newFolder}
+                        onChange={(e) => { setNewFolder(e.target.value); setFolder('') }}
+                        placeholder="e.g. travel-site"
+                        className="w-full px-3 py-2.5 bg-neutral-900/60 border border-neutral-800 rounded-xl text-sm text-white outline-none focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-neutral-600">
+                    Files save to <span className="text-cyan-300">/{folderPath()}/</span>
+                  </p>
+
+                  {/* Cover upload */}
+                  <div>
+                    <label className="text-[11px] text-neutral-500 uppercase tracking-widest px-1 mb-2 block">Cover image</label>
+                    <button
+                      type="button"
+                      disabled={uploadingCover}
+                      onClick={() => coverInputRef.current?.click()}
+                      className="w-full flex items-center justify-center gap-2 p-4 border-2 border-dashed border-neutral-800 hover:border-blue-500/50 rounded-xl text-neutral-400 hover:text-blue-300 transition-colors text-sm disabled:opacity-60"
+                    >
+                      {uploadingCover ? (
+                        <><Loader2 size={16} className="animate-spin" /> Uploading…</>
+                      ) : (
+                        <><Upload size={16} /> {data.image ? 'Replace cover image' : 'Upload cover image'}</>
+                      )}
+                    </button>
+                    <input
+                      ref={coverInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => handleCoverUpload(e.target.files)}
+                    />
+                    {data.image && (
+                      <div className="mt-2 rounded-xl overflow-hidden border border-neutral-800 bg-neutral-900/60 p-2 relative group">
+                        <img src={data.image} alt="cover" className="w-full h-32 object-cover object-top rounded-lg" />
+                        <button
+                          onClick={() => setData(d => ({ ...d, image: '' }))}
+                          className="absolute top-3 right-3 p-1 bg-red-600/80 hover:bg-red-500 rounded text-white"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Gallery upload */}
+                  <div>
+                    <label className="text-[11px] text-neutral-500 uppercase tracking-widest px-1 mb-2 block">Gallery images</label>
+                    {(data.images && data.images.length > 0) && (
+                      <div className="grid grid-cols-3 gap-2 mb-2">
+                        {data.images.map((img, idx) => (
+                          <div key={idx} className="relative group rounded-lg overflow-hidden border border-neutral-800 bg-neutral-900/60">
+                            <img src={img} alt="" className="w-full h-20 object-cover" />
+                            <button
+                              onClick={() => removeGalleryImage(img)}
+                              className="absolute top-1 right-1 p-1 bg-red-600/80 hover:bg-red-500 rounded text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              <X size={12} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      disabled={uploadingGallery}
+                      onClick={() => galleryInputRef.current?.click()}
+                      className="w-full flex items-center justify-center gap-2 p-4 border-2 border-dashed border-neutral-800 hover:border-blue-500/50 rounded-xl text-neutral-400 hover:text-blue-300 transition-colors text-sm disabled:opacity-60"
+                    >
+                      {uploadingGallery ? (
+                        <><Loader2 size={14} className="animate-spin" /> Uploading…</>
+                      ) : (
+                        <><Upload size={14} /> Upload gallery images</>
+                      )}
+                    </button>
+                    <input
+                      ref={galleryInputRef}
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      className="hidden"
+                      onChange={(e) => handleGalleryUpload(e.target.files)}
+                    />
+                  </div>
+                </div>
 
                 <Field label="Technologies" icon={<Tag size={12} />}>
                   <div className="flex flex-wrap gap-2 mb-2">
@@ -158,10 +325,6 @@ export default function NewProjectModal({ open, onClose, onSave }: NewProjectMod
                   <span className="text-sm font-medium text-white">Mark as featured</span>
                 </label>
 
-                <p className="text-[11px] text-neutral-500">
-                  After saving, open the project in the list to upload a cover image and gallery.
-                </p>
-
                 {error && <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-sm text-red-300">{error}</div>}
               </div>
 
@@ -174,7 +337,8 @@ export default function NewProjectModal({ open, onClose, onSave }: NewProjectMod
                 </button>
                 <button
                   onClick={handleSave}
-                  className="flex-[2] flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold shadow-lg shadow-blue-600/20"
+                  disabled={uploadingCover || uploadingGallery}
+                  className="flex-[2] flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold shadow-lg shadow-blue-600/20 disabled:opacity-60"
                 >
                   <Save size={16} /> Create project
                 </button>
