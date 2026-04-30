@@ -13,7 +13,7 @@ interface ProjectsProps {
 
 export default function Projects({ className }: ProjectsProps) {
   const [projects, setProjects] = useState<Project[]>(staticProjectsData.projects as Project[]);
-  const [visibleCount, setVisibleCount] = useState(3);
+  const [visibleCount, setVisibleCount] = useState(6);
   const [selectedProject, setSelectedProject] = useState<{ images: string[]; title: string; currentIndex: number } | null>(null);
 
   useEffect(() => {
